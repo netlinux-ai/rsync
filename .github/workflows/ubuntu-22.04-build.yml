@@ -1,39 +1,37 @@
-name: Test rsync on macOS
+name: Test rsync on Ubuntu 22.04
+
+# Older-LTS coverage to help with backporting security fixes. ubuntu-22.04
+# is currently the oldest GitHub Actions runner image (20.04 was retired
+# in April 2025).
 
 on:
   push:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
-      - '!.github/workflows/macos-build.yml'
+      - '!.github/workflows/ubuntu-22.04-build.yml'
   pull_request:
     branches: [ master ]
     paths-ignore:
       - '.github/workflows/*.yml'
-      - '!.github/workflows/macos-build.yml'
+      - '!.github/workflows/ubuntu-22.04-build.yml'
   schedule:
     - cron: '42 8 * * *'
 
 jobs:
   test:
-    runs-on: macos-latest
-    name: Test rsync on macOS
+    runs-on: ubuntu-22.04
+    name: Test rsync on Ubuntu 22.04
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
     - name: prep
       run: |
-        brew install automake openssl xxhash zstd lz4
-        pip3 install --user --break-system-packages commonmark
-        echo "$(brew --prefix)/bin" >>$GITHUB_PATH
+        sudo apt-get install acl libacl1-dev attr libattr1-dev liblz4-dev libzstd-dev libxxhash-dev python3-cmarkgfm openssl
+        echo "/usr/local/bin" >>$GITHUB_PATH
     - name: configure
-      run: |
-        BREW_PREFIX=$(brew --prefix)
-        OPENSSL_PREFIX=$(brew --prefix openssl)
-        CPPFLAGS="-I${BREW_PREFIX}/include -I${OPENSSL_PREFIX}/include" \
-        LDFLAGS="-L${BREW_PREFIX}/lib -L${OPENSSL_PREFIX}/lib" \
-        ./configure --with-rrsync
+      run: ./configure --with-rrsync
     - name: make
       run: make
     - name: install
@@ -41,13 +39,17 @@ jobs:
     - name: info
       run: rsync --version
     - name: check
-      run: sudo RSYNC_EXPECT_SKIPPED=acls-default,chmod-temp-dir,chown-fake,devices-fake,dir-sgid,open-noatime,protected-regular,simd-checksum,xattrs-hlink,xattrs make check
+      run: sudo RSYNC_EXPECT_SKIPPED=crtimes make check
+    - name: check30
+      run: sudo RSYNC_EXPECT_SKIPPED=crtimes make check30
+    - name: check29
+      run: sudo RSYNC_EXPECT_SKIPPED=crtimes make check29
     - name: ssl file list
       run: rsync-ssl --no-motd download.samba.org::rsyncftp/ || true
     - name: save artifact
       uses: actions/upload-artifact@v4
       with:
-        name: macos-bin
+        name: ubuntu-22.04-bin
         path: |
           rsync
           rsync-ssl
